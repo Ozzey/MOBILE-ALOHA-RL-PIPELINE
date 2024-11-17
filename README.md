@@ -2,10 +2,11 @@
 
 This repository is based on OmniIsaacGymEnvs & Isaac-Sim 2023 and is used for autonomous Mobile Aloha tasks. 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/482e79eb-6153-4344-86e2-c68d7a34d112" alt="AlohaKitchenCabinet" width="400"/>
-  <img src="https://github.com/user-attachments/assets/dc0e20ff-304a-41fa-99ef-4b3c24bd691f" alt="AlohaPlacePlateKitchen" width="400"/>
-  <img src="https://github.com/user-attachments/assets/5ff9ec2f-cafd-4e72-998e-022d0142e4a9" alt="AlohaPickAppleKitchen" width="400"/>
+  <img src="https://github.com/user-attachments/assets/f358545a-64be-44eb-8107-a6842809beca" alt="AlohaPickAppleKitchen" width="400"/>
+  <img src="https://github.com/user-attachments/assets/26f03e0c-2af0-48c7-b91b-d30c338cbb3d" alt="AlohaPlacePlateKitchen" width="400"/>
+  <img src="https://github.com/user-attachments/assets/a7426a74-511e-4f6f-9aea-060fd7d11219" alt="AlohaKitchenCabinet" width="400"/>
 </p>
+
 
 
 ## Installation
