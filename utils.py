@@ -40,6 +40,7 @@ def import_tasks():
     from tasks.mobile_aloha.mobile_aloha_pick_camera import MobileAlohaPickCameraTask
     from tasks.mobile_aloha.mobile_aloha_place_camera import MobileAlohaPlaceCameraTask
     
+    from tasks.aloha.aloha_pick_llm import AlohaPickLLMTask
 
     # Mappings from strings to environments
     task_map = {
@@ -54,6 +55,8 @@ def import_tasks():
 
         "MobileAlohaPickCamera": MobileAlohaPickCameraTask,
         "MobileAlohaPlaceCamera": MobileAlohaPlaceCameraTask,
+
+        "AlohaPickLLM": AlohaPickLLMTask
     }
     return task_map
 
