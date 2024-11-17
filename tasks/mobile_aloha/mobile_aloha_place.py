@@ -5,6 +5,8 @@ from robots.articulations.views.mobile_aloha_view import MobileAlohaView
 from omniisaacgymenvs.robots.articulations.cabinet import Cabinet
 from omniisaacgymenvs.robots.articulations.views.cabinet_view import CabinetView
 
+from robots.articulations.kitchen import Kitchen
+from robots.articulations.views.kitchen_view import KitchenView
 
 from omni.isaac.core.objects import DynamicCuboid
 from omni.isaac.core.prims import RigidPrim, RigidPrimView
@@ -79,6 +81,8 @@ class MobileAlohaPlaceTask(RLTask):
         self.get_target_cube()
         self.get_cabinet()
 
+        self.get_kitchen()
+
         # Here the env is cloned 
         super().set_up_scene(scene)
 
@@ -135,6 +139,14 @@ class MobileAlohaPlaceTask(RLTask):
             "cabinet", get_prim_at_path(cabinet.prim_path), self._sim_config.parse_actor_config("cabinet")
         )
     
+
+    def get_kitchen(self):
+        kitchen = Kitchen(self.default_zero_env_path + "/kitchen", name="kitchen")
+        self._sim_config.apply_articulation_settings(
+            "kitchen", get_prim_at_path(kitchen.prim_path), self._sim_config.parse_actor_config("kitchen")
+        )
+
+
     # Set as testing mode
     def set_as_test(self):
         self.is_test = True

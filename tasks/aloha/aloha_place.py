@@ -1,6 +1,10 @@
 from omniisaacgymenvs.tasks.base.rl_task import RLTask
+
 from robots.articulations.aloha import Aloha
 from robots.articulations.views.aloha_view import AlohaView
+
+from robots.articulations.kitchen import Kitchen
+from robots.articulations.views.kitchen_view import KitchenView
 
 
 from omni.isaac.core.objects import DynamicCuboid
@@ -76,6 +80,9 @@ class AlohaPlaceTask(RLTask):
         self.get_cube()
         self.get_target_cube()
 
+        # IF YOUR GPU ISN'T POWERFUL ENOUGH, COMMENT THIS LINE
+        self.get_kitchen()
+
         # Here the env is cloned 
         super().set_up_scene(scene)
 
@@ -89,7 +96,6 @@ class AlohaPlaceTask(RLTask):
         self._target_cube = RigidPrimView(prim_paths_expr="/World/envs/.*/target_cube", name="target_cube_view", reset_xform_properties=False)
 
         
-
         scene.add(self._frankas)
         scene.add(self._frankas._hands)
         scene.add(self._frankas._lfingers)
@@ -105,7 +111,6 @@ class AlohaPlaceTask(RLTask):
         self._sim_config.apply_articulation_settings("aloha", get_prim_at_path(franka.prim_path), self._sim_config.parse_actor_config("aloha"))
 
     def get_cube(self):
-
         cube = DynamicCuboid(
                 name = 'cube',
                 position=[-0.03, 0.0,  0.19],
@@ -117,8 +122,6 @@ class AlohaPlaceTask(RLTask):
             )
 
     def get_target_cube(self):
-
-
         target_cube = DynamicCuboid(
                 name = 'target_cube',
                 position=[-0.3, 0.1, 0.025],
@@ -128,6 +131,13 @@ class AlohaPlaceTask(RLTask):
                 color=np.array([0, 1, 0]),
                 density = 100
             )
+
+
+    def get_kitchen(self):
+        kitchen = Kitchen(self.default_zero_env_path + "/kitchen", name="kitchen")
+        self._sim_config.apply_articulation_settings(
+            "kitchen", get_prim_at_path(kitchen.prim_path), self._sim_config.parse_actor_config("kitchen")
+        )
 
     # Set as testing mode
     def set_as_test(self):

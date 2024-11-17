@@ -25,6 +25,10 @@ from omniisaacgymenvs.robots.articulations.views.cabinet_view import CabinetView
 
 from robots.articulations.aloha import Aloha
 from robots.articulations.views.aloha_view import AlohaView
+
+from robots.articulations.kitchen import Kitchen
+from robots.articulations.views.kitchen_view import KitchenView
+
 from pxr import Usd, UsdGeom
 
 
@@ -68,6 +72,9 @@ class AlohaPickTask(RLTask):
     def set_up_scene(self, scene) -> None:
         self.get_aloha()
         self.get_beaker()
+        
+        # IF YOUR GPU ISN'T POWERFUL ENOUGH, COMMENT THIS LINE
+        self.get_kitchen()
 
         super().set_up_scene(scene, filter_collisions=False)
 
@@ -106,6 +113,13 @@ class AlohaPickTask(RLTask):
                 color=np.array([1, 0, 0]),
                 density = 100
             )
+
+    def get_kitchen(self):
+        kitchen = Kitchen(self.default_zero_env_path + "/kitchen", name="kitchen")
+        self._sim_config.apply_articulation_settings(
+            "kitchen", get_prim_at_path(kitchen.prim_path), self._sim_config.parse_actor_config("kitchen")
+        )
+
 
     def init_data(self) -> None:
         def get_env_local_pose(env_pos, xformable, device):

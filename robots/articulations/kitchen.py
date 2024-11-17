@@ -11,6 +11,11 @@ from typing import Optional
 
 import numpy as np
 import torch
+
+import json
+from pathlib import Path
+
+
 from omni.isaac.core.robots.robot import Robot
 from omni.isaac.core.utils.nucleus import get_assets_root_path
 from omni.isaac.core.utils.stage import add_reference_to_stage
@@ -30,8 +35,12 @@ class Kitchen(Robot):
         self._name = name
 
         if self._usd_path is None:
-            self._usd_path = "/home/jacob/Desktop/assets/scenes/sber_kitchen/sber_kitchen_12_1.usd"
-
+            project_root = Path(__file__).resolve().parents[2]            
+            config_path = project_root / "config.json"  # Relative path to config.json
+            # Load USD path from config.json
+            with open(config_path, 'r') as file:
+                config = json.load(file)
+                self._usd_path = str(project_root / config.get('kitchen_usd_path')) 
         add_reference_to_stage(self._usd_path, prim_path)
 
         self._position = torch.tensor([0.0, 0.0, 0.0]) if translation is None else translation

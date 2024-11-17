@@ -31,15 +31,29 @@ def import_tasks():
     from tasks.aloha.aloha_pick import AlohaPickTask
     from tasks.aloha.aloha_place import AlohaPlaceTask
     
+    from tasks.aloha.aloha_pick_camera import AlohaPickCameraTask
+    from tasks.aloha.aloha_place_camera import AlohaPlaceCameraTask
+
     from tasks.mobile_aloha.mobile_aloha_pick import MobileAlohaPickTask
     from tasks.mobile_aloha.mobile_aloha_place import MobileAlohaPlaceTask
+
+    from tasks.mobile_aloha.mobile_aloha_pick_camera import MobileAlohaPickCameraTask
+    from tasks.mobile_aloha.mobile_aloha_place_camera import MobileAlohaPlaceCameraTask
     
+
     # Mappings from strings to environments
     task_map = {
         "AlohaPick": AlohaPickTask,
         "AlohaPlace": AlohaPlaceTask,
+
+        "AlohaPickCamera": AlohaPickCameraTask,
+        "AlohaPlaceCamera": AlohaPlaceCameraTask,
+
         "MobileAlohaPick": MobileAlohaPickTask,
-        "MobileAlohaPlace": MobileAlohaPlaceTask
+        "MobileAlohaPlace": MobileAlohaPlaceTask,
+
+        "MobileAlohaPickCamera": MobileAlohaPickCameraTask,
+        "MobileAlohaPlaceCamera": MobileAlohaPlaceCameraTask,
     }
     return task_map
 

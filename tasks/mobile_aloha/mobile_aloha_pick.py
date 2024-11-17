@@ -27,6 +27,10 @@ from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stag
 
 from robots.articulations.mobile_aloha import MobileAloha
 from robots.articulations.views.mobile_aloha_view import MobileAlohaView
+
+from robots.articulations.kitchen import Kitchen
+from robots.articulations.views.kitchen_view import KitchenView
+
 from pxr import Usd, UsdGeom
 
 
@@ -115,6 +119,12 @@ class MobileAlohaPickTask(RLTask):
                 color=np.array([0, 1, 0]),
                 density = 100
             )
+
+    def get_kitchen(self):
+        kitchen = Kitchen(self.default_zero_env_path + "/kitchen", name="kitchen")
+        self._sim_config.apply_articulation_settings(
+            "kitchen", get_prim_at_path(kitchen.prim_path), self._sim_config.parse_actor_config("kitchen")
+        )
 
 
     def init_data(self) -> None:
