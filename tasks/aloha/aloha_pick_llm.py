@@ -11,22 +11,20 @@ import math
 
 import numpy as np
 import torch
-from omni.isaac.cloner import GridCloner, Cloner
+from omni.isaac.cloner import Cloner
 from omni.isaac.core.objects import DynamicCuboid
 from omni.isaac.core.objects import FixedCuboid
-from omni.isaac.core.prims.xform_prim import XFormPrim
 from omni.isaac.core.prims import RigidPrim, RigidPrimView
 from omni.isaac.core.utils.prims import get_prim_at_path
-from omni.isaac.core.utils.stage import get_current_stage
+from omni.isaac.core.utils.stage import get_current_stage, add_reference_to_stage
 from omni.isaac.core.utils.torch.rotations import *
 from omni.isaac.core.utils.torch.transformations import *
 from omniisaacgymenvs.tasks.base.rl_task import RLTask
 from omniisaacgymenvs.robots.articulations.cabinet import Cabinet
 from omniisaacgymenvs.robots.articulations.views.cabinet_view import CabinetView
-from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
 
-from robots.articulations.mobile_aloha import MobileAloha
-from robots.articulations.views.mobile_aloha_view import MobileAlohaView
+from robots.articulations.aloha import Aloha
+from robots.articulations.views.aloha_view import AlohaView
 
 from robots.articulations.kitchen import Kitchen
 from robots.articulations.views.kitchen_view import KitchenView
@@ -34,7 +32,7 @@ from robots.articulations.views.kitchen_view import KitchenView
 from pxr import Usd, UsdGeom
 
 
-class MobileAlohaPickTask(RLTask):
+class AlohaPickLLMTask(RLTask):
     def __init__(self, name, sim_config, env, offset=None) -> None:
         self.update_config(sim_config)
 
@@ -70,54 +68,88 @@ class MobileAlohaPickTask(RLTask):
         self.finger_dist_reward_scale = self._task_cfg["env"]["fingerDistRewardScale"]
         self.action_penalty_scale = self._task_cfg["env"]["actionPenaltyScale"]
         self.finger_close_reward_scale = self._task_cfg["env"]["fingerCloseRewardScale"]
+        self.apple = self._task_cfg["env"]["apple"]
 
     def set_up_scene(self, scene) -> None:
         self.get_aloha()
         self.get_beaker()
-        self.get_cabinet()
+        self.get_apple()
+        
+        # IF YOUR GPU ISN'T POWERFUL ENOUGH, COMMENT THIS LINE
+        self.get_kitchen()
 
         super().set_up_scene(scene, filter_collisions=False)
 
-        self._alohas = MobileAlohaView(prim_paths_expr="/World/envs/.*/aloha", name="aloha_view")
+        self._alohas = AlohaView(prim_paths_expr="/World/envs/.*/aloha", name="aloha_view")
         self._beaker = RigidPrimView(prim_paths_expr="/World/envs/.*/beaker", name="beaker_view")
+        self._apple = RigidPrimView(prim_paths_expr="/World/envs/.*/apple", name="apple_view")
 
         scene.add(self._alohas)
         scene.add(self._alohas._hands)
         scene.add(self._alohas._lfingers)
         scene.add(self._alohas._rfingers)
-        scene.add(self._beaker)        
-
+        scene.add(self._beaker)
+        scene.add(self._apple)
+        
         self.init_data()
         return
 
 
     def get_aloha(self):
-        aloha = MobileAloha(prim_path=self.default_zero_env_path + "/aloha", name="aloha")
+        aloha = Aloha(prim_path=self.default_zero_env_path + "/aloha", name="aloha")
         self._sim_config.apply_articulation_settings(
             "aloha", get_prim_at_path(aloha.prim_path), self._sim_config.parse_actor_config("aloha")
         )
         prim = get_prim_at_path(aloha.prim_path)
         prim.GetAttribute("physxRigidBody:disableGravity")
 
-    def get_cabinet(self):
-        cabinet = Cabinet(self.default_zero_env_path + "/cabinet", name="cabinet")
-        self._sim_config.apply_articulation_settings(
-            "cabinet", get_prim_at_path(cabinet.prim_path), self._sim_config.parse_actor_config("cabinet")
-        )
-
 
     def get_beaker(self):
         """
         Add a beaker to the scene.
         """
-        beaker = DynamicCuboid(
-                name = 'beaker',
-                position=[0.05, 0.0,  0.8],
-                orientation=[1,0,0,0],
-                size=0.05,
-                prim_path=self.default_zero_env_path + "/beaker",
-                color=np.array([0, 1, 0]),
-                density = 100
+        
+        if self.apple:
+            beaker_path = '/home/jacob/Desktop/assets/objects/apple.usd'
+            add_reference_to_stage(usd_path=beaker_path, prim_path=self.default_zero_env_path + "/beaker")
+            beaker = RigidPrim(
+                name='beaker',
+                position=[0.0, 0.05, 0.0],
+                scale=torch.tensor([0.006, 0.006, 0.006], dtype=torch.float32),
+                prim_path =self.default_zero_env_path + "/beaker"
+            )
+        else:
+            beaker = DynamicCuboid(
+                    name = 'beaker',
+                    position=[0.0, -0.05,  0.0],
+                    orientation=[1,0,0,0],
+                    size=0.05,
+                    prim_path=self.default_zero_env_path + "/beaker",
+                    color=np.array([1, 0, 0]),
+                    density = 100
+                )
+
+
+    def get_apple(self):
+        
+        if self.apple:
+            apple = DynamicCuboid(
+                    name = 'apple',
+                    position=[0.0, -0.05,  0.0],
+                    orientation=[1,0,0,0],
+                    size=0.05,
+                    prim_path=self.default_zero_env_path + "/apple",
+                    color=np.array([1, 0, 0]),
+                    density = 100
+                )
+        else:
+            apple_path = '/home/jacob/Desktop/assets/objects/apple.usd'
+            add_reference_to_stage(usd_path=apple_path, prim_path=self.default_zero_env_path + "/apple")
+            apple = RigidPrim(
+                name='apple',
+                position=[0.0, 0.05, 0.0],
+                scale=torch.tensor([0.006, 0.006, 0.006], dtype=torch.float32),
+                prim_path =self.default_zero_env_path + "/apple"
             )
 
     def get_kitchen(self):
@@ -147,17 +179,17 @@ class MobileAlohaPickTask(RLTask):
         stage = get_current_stage()
         hand_pose = get_env_local_pose(
             self._env_pos[0],
-            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/fl_link6")),
+            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/link6")),
             self._device,
         )
         lfinger_pose = get_env_local_pose(
             self._env_pos[0],
-            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/fl_link7")),
+            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/link7")),
             self._device,
         )
         rfinger_pose = get_env_local_pose(
             self._env_pos[0],
-            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/fl_link8")),
+            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/link8")),
             self._device,
         )
 
@@ -276,6 +308,7 @@ class MobileAlohaPickTask(RLTask):
         self.franka_dof_pos[env_ids, :] = pos
 
         self._beaker.set_world_poses(self.default_beaker_pos[env_ids], self.default_beaker_rot[env_ids], env_ids.to(torch.int32))
+        self._apple.set_world_poses(self.default_apple_pos[env_ids], self.default_apple_rot[env_ids], env_ids.to(torch.int32))
 
         self._alohas.set_joint_position_targets(self.franka_dof_targets[env_ids], indices=indices)
         self._alohas.set_joint_positions(dof_pos, indices=indices)
@@ -299,6 +332,7 @@ class MobileAlohaPickTask(RLTask):
         )
 
         self.default_beaker_pos, self.default_beaker_rot = self._beaker.get_world_poses()
+        self.default_apple_pos, self.default_apple_rot = self._apple.get_world_poses()
 
         # randomize all envs
         indices = torch.arange(self._num_envs, dtype=torch.int64, device=self._device)
@@ -335,7 +369,7 @@ class MobileAlohaPickTask(RLTask):
     def is_done(self) -> None:
         # reset if drawer is open or max length reached
         drawer_curr_pos, _ =  self._beaker.get_world_poses(clone=False)
-        self.reset_buf = torch.where(drawer_curr_pos[:, 2] > 1.45, torch.ones_like(self.reset_buf), self.reset_buf)
+        self.reset_buf = torch.where(drawer_curr_pos[:, 2] > 0.45, torch.ones_like(self.reset_buf), self.reset_buf)
         self.reset_buf = torch.where(
             self.progress_buf >= self._max_episode_length - 1, torch.ones_like(self.reset_buf), self.reset_buf
         )
@@ -432,7 +466,9 @@ class MobileAlohaPickTask(RLTask):
         
         drawer_curr_pos, _ =  self._beaker.get_world_poses(clone=False)
 
-        open_reward = drawer_curr_pos[:,2]/4
+
+        open_reward = drawer_curr_pos[:,2]*10
+
         # print(open_reward)
 
         action_penalty = torch.sum(actions**2, dim=-1)
@@ -447,8 +483,8 @@ class MobileAlohaPickTask(RLTask):
         )
 
         # bonus for opening drawer properly
-        rewards = torch.where(drawer_curr_pos[:, 2] > 1.3, rewards + 0.5, rewards)
-        rewards = torch.where(drawer_curr_pos[:, 2] > 1.4, rewards + open_reward, rewards)
-        rewards = torch.where(drawer_curr_pos[:, 2] > 1.45, rewards + (2.0 * open_reward), rewards)
+        rewards = torch.where(drawer_curr_pos[:, 2] > 0.3, rewards + 0.5, rewards)
+        rewards = torch.where(drawer_curr_pos[:, 2] > 0.4, rewards + open_reward, rewards)
+        rewards = torch.where(drawer_curr_pos[:, 2] > 0.45, rewards + (2.0 * open_reward), rewards)
 
         return rewards

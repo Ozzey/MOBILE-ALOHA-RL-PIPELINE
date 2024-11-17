@@ -10,6 +10,9 @@
 import math
 from typing import Optional
 
+import json
+from pathlib import Path
+
 import numpy as np
 import torch
 from omni.isaac.core.robots.robot import Robot
@@ -40,7 +43,18 @@ class Aloha(Robot):
         self._scale = torch.tensor([1.0, 1.0, 1.0]) if scale is None else scale
 
         if self._usd_path is None:
-            self._usd_path = "/home/jacob/Desktop/assets/aloha-assets/viperx.usd"
+            project_root = Path(__file__).resolve().parents[2]
+            
+            config_path = project_root / "config.json"  # Relative path to config.json
+
+            # Load USD path from config.json
+            with open(config_path, 'r') as file:
+                config = json.load(file)
+                self._usd_path = str(project_root / config.get('aloha_usd_path')) 
+            
+            #self._usd_path = "/home/jacob/Desktop/assets/aloha-assets/viperx.usd"
+
+
 
         add_reference_to_stage(self._usd_path, prim_path)
 

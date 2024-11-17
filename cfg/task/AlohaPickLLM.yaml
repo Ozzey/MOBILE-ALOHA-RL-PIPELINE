@@ -1,5 +1,5 @@
 # used to create the object
-name: AlohaPick
+name: AlohaPickLLM
 
 physics_engine: ${..physics_engine}
 
@@ -30,6 +30,8 @@ env:
   fingerDistRewardScale: 100.0
   actionPenaltyScale: 0.01
   fingerCloseRewardScale: 10.0
+
+  apple: False
 
 sim:
   dt: 0.0083 # 1/120 s
