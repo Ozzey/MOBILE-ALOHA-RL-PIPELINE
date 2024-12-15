@@ -11,9 +11,10 @@ import math
 
 import numpy as np
 import torch
-from omni.isaac.cloner import Cloner
+from omni.isaac.cloner import GridCloner, Cloner
 from omni.isaac.core.objects import DynamicCuboid
 from omni.isaac.core.objects import FixedCuboid
+from omni.isaac.core.prims.xform_prim import XFormPrim
 from omni.isaac.core.prims import RigidPrim, RigidPrimView
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import get_current_stage
@@ -22,9 +23,10 @@ from omni.isaac.core.utils.torch.transformations import *
 from omniisaacgymenvs.tasks.base.rl_task import RLTask
 from omniisaacgymenvs.robots.articulations.cabinet import Cabinet
 from omniisaacgymenvs.robots.articulations.views.cabinet_view import CabinetView
+from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
 
-from robots.articulations.aloha import Aloha
-from robots.articulations.views.aloha_view import AlohaView
+from robots.articulations.nav_aloha import MobileAloha
+from robots.articulations.views.mobile_aloha_view import MobileAlohaView
 
 from robots.articulations.kitchen import Kitchen
 from robots.articulations.views.kitchen_view import KitchenView
@@ -32,7 +34,7 @@ from robots.articulations.views.kitchen_view import KitchenView
 from pxr import Usd, UsdGeom
 
 
-class AlohaPickTask(RLTask):
+class MobilePickTask(RLTask):
     def __init__(self, name, sim_config, env, offset=None) -> None:
         self.update_config(sim_config)
 
@@ -69,19 +71,16 @@ class AlohaPickTask(RLTask):
         self.action_penalty_scale = self._task_cfg["env"]["actionPenaltyScale"]
         self.finger_close_reward_scale = self._task_cfg["env"]["fingerCloseRewardScale"]
 
-        self.kitchen = self._task_cfg["env"]["numEnvs"] == 1
+        self.joint_indices = [6, 14, 18, 22, 26, 30, 34, 35]
 
     def set_up_scene(self, scene) -> None:
         self.get_aloha()
         self.get_beaker()
-        
-        # IF YOUR GPU ISN'T POWERFUL ENOUGH, COMMENT THIS LINE
-        if self.kitchen:
-            self.get_kitchen()
+        self.get_cabinet()
 
         super().set_up_scene(scene, filter_collisions=False)
 
-        self._alohas = AlohaView(prim_paths_expr="/World/envs/.*/aloha", name="aloha_view")
+        self._alohas = MobileAlohaView(prim_paths_expr="/World/envs/.*/aloha", name="aloha_view")
         self._beaker = RigidPrimView(prim_paths_expr="/World/envs/.*/beaker", name="beaker_view")
 
         scene.add(self._alohas)
@@ -95,12 +94,21 @@ class AlohaPickTask(RLTask):
 
 
     def get_aloha(self):
-        aloha = Aloha(prim_path=self.default_zero_env_path + "/aloha", name="aloha")
+        aloha = MobileAloha(prim_path=self.default_zero_env_path + "/aloha",
+                            name="aloha",
+                            translation=torch.tensor([2.0, 0.25, 0.0]),
+                            orientation=torch.tensor([0.0, 0.0, 0.0, 0.0]))
         self._sim_config.apply_articulation_settings(
             "aloha", get_prim_at_path(aloha.prim_path), self._sim_config.parse_actor_config("aloha")
         )
         prim = get_prim_at_path(aloha.prim_path)
         prim.GetAttribute("physxRigidBody:disableGravity")
+
+    def get_cabinet(self):
+        cabinet = Cabinet(self.default_zero_env_path + "/cabinet", name="cabinet")
+        self._sim_config.apply_articulation_settings(
+            "cabinet", get_prim_at_path(cabinet.prim_path), self._sim_config.parse_actor_config("cabinet")
+        )
 
 
     def get_beaker(self):
@@ -109,11 +117,11 @@ class AlohaPickTask(RLTask):
         """
         beaker = DynamicCuboid(
                 name = 'beaker',
-                position=[0.0, 0.0,  0.0],
+                position=[0.05, 0.0,  0.8],
                 orientation=[1,0,0,0],
                 size=0.05,
                 prim_path=self.default_zero_env_path + "/beaker",
-                color=np.array([1, 0, 0]),
+                color=np.array([0, 1, 0]),
                 density = 100
             )
 
@@ -144,17 +152,17 @@ class AlohaPickTask(RLTask):
         stage = get_current_stage()
         hand_pose = get_env_local_pose(
             self._env_pos[0],
-            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/link6")),
+            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/fl_link6")),
             self._device,
         )
         lfinger_pose = get_env_local_pose(
             self._env_pos[0],
-            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/link7")),
+            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/fl_link7")),
             self._device,
         )
         rfinger_pose = get_env_local_pose(
             self._env_pos[0],
-            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/link8")),
+            UsdGeom.Xformable(stage.GetPrimAtPath("/World/envs/env_0/aloha/fl_link8")),
             self._device,
         )
 
@@ -198,8 +206,9 @@ class AlohaPickTask(RLTask):
     def get_observations(self) -> dict:
         hand_pos, hand_rot = self._alohas._hands.get_world_poses(clone=False)
         drawer_pos, drawer_rot = self._beaker.get_world_poses(clone=False)
-        franka_dof_pos = self._alohas.get_joint_positions(clone=False)
-        franka_dof_vel = self._alohas.get_joint_velocities(clone=False)
+        franka_dof_pos = self._alohas.get_joint_positions(clone=False)[:, self.joint_indices]
+        franka_dof_vel = self._alohas.get_joint_velocities(clone=False)[:, self.joint_indices]
+        # print(franka_dof_pos)
         self.franka_dof_pos = franka_dof_pos
 
         (
@@ -248,12 +257,36 @@ class AlohaPickTask(RLTask):
         if len(reset_env_ids) > 0:
             self.reset_idx(reset_env_ids)
 
-        self.actions = actions.clone().to(self._device)
-        targets = self.franka_dof_targets + self.franka_dof_speed_scales * self.dt * self.actions * self.action_scale
-        self.franka_dof_targets[:] = tensor_clamp(targets, self.franka_dof_lower_limits, self.franka_dof_upper_limits)
         env_ids_int32 = torch.arange(self._alohas.count, dtype=torch.int32, device=self._device)
 
-        self._alohas.set_joint_position_targets(self.franka_dof_targets, indices=env_ids_int32)
+        aloha_pos,rot = self._alohas.get_world_poses(clone=False)
+        target_orientation = torch.tensor([0.0, 0.0, 0.0, 1.0], device=self._device)
+
+        # Calculate the difference between the current orientation and the target orientation
+        orientation_diff = torch.norm(rot - target_orientation, dim=-1)
+        
+        dist = torch.norm(aloha_pos - self.default_beaker_pos, dim=-1)
+        if dist < 1.15:
+            self.actions = actions.clone().to(self._device)
+            targets = self.franka_dof_targets + self.franka_dof_speed_scales * self.dt * self.actions * self.action_scale
+            self.franka_dof_targets[:] = tensor_clamp(targets, self.franka_dof_lower_limits, self.franka_dof_upper_limits)
+
+            self._alohas.set_joint_position_targets(self.franka_dof_targets, indices=env_ids_int32, joint_indices=self.joint_indices)
+            
+            wheel_vel = self._alohas.get_joint_velocities(indices=env_ids_int32, joint_indices=[2,3])
+            if torch.any(wheel_vel != 0):
+                velocities = torch.zeros_like(wheel_vel)
+                self._alohas.set_joint_velocities(velocities, indices=env_ids_int32, joint_indices=[2,3])
+            
+        elif orientation_diff > 0.05:  # Tolerance for approximation
+            velocities = torch.tensor([[5.0]] * len(env_ids_int32), device=self._device)
+            self._alohas.set_joint_velocities(velocities, indices=env_ids_int32, joint_indices=[3])
+            velocities = torch.tensor([[-5.0]] * len(env_ids_int32), device=self._device)
+            self._alohas.set_joint_velocities(velocities, indices=env_ids_int32, joint_indices=[2])
+        else:
+            velocities = torch.tensor([[10.0, 10.0]] * len(env_ids_int32))
+            self._alohas.set_joint_velocities(velocities, indices=env_ids_int32, joint_indices=[2,3])
+
 
     def reset_idx(self, env_ids):
         indices = env_ids.to(dtype=torch.int32)
@@ -266,8 +299,8 @@ class AlohaPickTask(RLTask):
             self.franka_dof_lower_limits,
             self.franka_dof_upper_limits,
         )
-        dof_pos = torch.zeros((num_indices, self._alohas.num_dof), device=self._device)
-        dof_vel = torch.zeros((num_indices, self._alohas.num_dof), device=self._device)
+        dof_pos = torch.zeros((num_indices, 8), device=self._device)
+        dof_vel = torch.zeros((num_indices, 8), device=self._device)
         dof_pos[:, :] = pos
         self.franka_dof_targets[env_ids, :] = pos
         self.franka_dof_pos[env_ids, :] = pos
@@ -275,23 +308,25 @@ class AlohaPickTask(RLTask):
         self._beaker.set_world_poses(self.default_beaker_pos[env_ids], self.default_beaker_rot[env_ids], env_ids.to(torch.int32))
         self._beaker.set_velocities(torch.zeros_like(self.default_beaker_velocity[env_ids]), env_ids.to(torch.int32))
         
-        self._alohas.set_joint_position_targets(self.franka_dof_targets[env_ids], indices=indices)
-        self._alohas.set_joint_positions(dof_pos, indices=indices)
-        self._alohas.set_joint_velocities(dof_vel, indices=indices)
-
+        self._alohas.set_joint_position_targets(self.franka_dof_targets[env_ids], indices=indices, joint_indices=self.joint_indices)
+        self._alohas.set_joint_positions(dof_pos, indices=indices, joint_indices=self.joint_indices)
+        self._alohas.set_joint_velocities(dof_vel, indices=indices, joint_indices=self.joint_indices)
+        # print("reset_working")
         # bookkeeping
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
 
     def post_reset(self):
-        self.num_franka_dofs = self._alohas.num_dof
+        self.num_franka_dofs = 8
         self.franka_dof_pos = torch.zeros((self.num_envs, self.num_franka_dofs), device=self._device)
         dof_limits = self._alohas.get_dof_limits()
-        self.franka_dof_lower_limits = dof_limits[0, :, 0].to(device=self._device)
-        self.franka_dof_upper_limits = dof_limits[0, :, 1].to(device=self._device)
+        self.franka_dof_lower_limits = dof_limits[0, self.joint_indices, 0].to(device=self._device)
+        self.franka_dof_upper_limits = dof_limits[0, self.joint_indices, 1].to(device=self._device)
         self.franka_dof_speed_scales = torch.ones_like(self.franka_dof_lower_limits)
-        self.franka_dof_speed_scales[self._alohas.gripper_indices] = 0.1
+        # print(self.franka_dof_speed_scales)
+        # self.franka_dof_speed_scales[: ,34:35, :] = 0.1
+        # self.franka_dof_speed_scales[34] = 0.1
         self.franka_dof_targets = torch.zeros(
             (self._num_envs, self.num_franka_dofs), dtype=torch.float, device=self._device
         )
@@ -334,7 +369,7 @@ class AlohaPickTask(RLTask):
     def is_done(self) -> None:
         # reset if drawer is open or max length reached
         drawer_curr_pos, _ =  self._beaker.get_world_poses(clone=False)
-        self.reset_buf = torch.where(drawer_curr_pos[:, 2] > 0.45, torch.ones_like(self.reset_buf), self.reset_buf)
+        self.reset_buf = torch.where(drawer_curr_pos[:, 2] > 1.45, torch.ones_like(self.reset_buf), self.reset_buf)
         self.reset_buf = torch.where(
             self.progress_buf >= self._max_episode_length - 1, torch.ones_like(self.reset_buf), self.reset_buf
         )
@@ -431,9 +466,7 @@ class AlohaPickTask(RLTask):
         
         drawer_curr_pos, _ =  self._beaker.get_world_poses(clone=False)
 
-
-        open_reward = drawer_curr_pos[:,2]*10
-
+        open_reward = drawer_curr_pos[:,2]/4
         # print(open_reward)
 
         action_penalty = torch.sum(actions**2, dim=-1)
@@ -448,8 +481,8 @@ class AlohaPickTask(RLTask):
         )
 
         # bonus for opening drawer properly
-        rewards = torch.where(drawer_curr_pos[:, 2] > 0.3, rewards + 0.5, rewards)
-        rewards = torch.where(drawer_curr_pos[:, 2] > 0.4, rewards + open_reward, rewards)
-        rewards = torch.where(drawer_curr_pos[:, 2] > 0.45, rewards + (2.0 * open_reward), rewards)
+        rewards = torch.where(drawer_curr_pos[:, 2] > 1.3, rewards + 0.5, rewards)
+        rewards = torch.where(drawer_curr_pos[:, 2] > 1.4, rewards + open_reward, rewards)
+        rewards = torch.where(drawer_curr_pos[:, 2] > 1.45, rewards + (2.0 * open_reward), rewards)
 
         return rewards

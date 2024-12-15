@@ -8,7 +8,7 @@
 #
 
 import math
-
+from pathlib import Path
 import numpy as np
 import torch
 from omni.isaac.cloner import Cloner
@@ -110,7 +110,8 @@ class AlohaPickLLMTask(RLTask):
         """
         
         if self.apple:
-            beaker_path = '/home/jacob/Desktop/assets/objects/apple.usd'
+            project_root = Path(__file__).resolve().parents[2]            
+            beaker_path = str(project_root / "assets/objects/apple.usd")
             add_reference_to_stage(usd_path=beaker_path, prim_path=self.default_zero_env_path + "/beaker")
             beaker = RigidPrim(
                 name='beaker',
@@ -143,7 +144,8 @@ class AlohaPickLLMTask(RLTask):
                     density = 100
                 )
         else:
-            apple_path = '/home/jacob/Desktop/assets/objects/apple.usd'
+            project_root = Path(__file__).resolve().parents[2]            
+            beaker_path = str(project_root / "assets/objects/apple.usd")
             add_reference_to_stage(usd_path=apple_path, prim_path=self.default_zero_env_path + "/apple")
             apple = RigidPrim(
                 name='apple',

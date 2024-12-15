@@ -21,13 +21,8 @@ class MobileAlohaPickCameraTask(MobileAlohaPickTask):
         self._max_episode_length = 500
         self.distX_offset = 0.04
         self.dt = 1 / 120.0
-        self._num_observations = self.camera_width * self.camera_height * 3
         self._num_actions = 8
 
-        # use multi-dimensional observation for camera RGB
-        self.observation_space = spaces.Box(
-            np.ones((self.camera_width, self.camera_height, 3), dtype=np.float32) * -np.Inf, 
-            np.ones((self.camera_width, self.camera_height, 3), dtype=np.float32) * np.Inf)
 
         RLTask.__init__(self, name, env)
 
@@ -58,17 +53,11 @@ class MobileAlohaPickCameraTask(MobileAlohaPickTask):
         self.camera_type = self._task_cfg["env"].get("cameraType", 'rgb')
         self.camera_width = self._task_cfg["env"]["cameraWidth"]
         self.camera_height = self._task_cfg["env"]["cameraHeight"]
-        
+        self._num_observations = 19
         self.camera_channels = 3
         self._export_images = self._task_cfg["env"]["exportImages"]
+        self.kitchen = self._task_cfg["env"]["numEnvs"] == 1
 
-    def cleanup(self) -> None:
-        # initialize remaining buffers
-        RLTask.cleanup(self)
-
-        # override observation buffer for camera data
-        self.obs_buf = torch.zeros(
-            (self.num_envs, self.camera_width, self.camera_height, 3), device=self.device, dtype=torch.float)
 
     def add_camera(self) -> None:
         stage = get_current_stage()
@@ -95,8 +84,9 @@ class MobileAlohaPickCameraTask(MobileAlohaPickTask):
         self.get_aloha()
         self.get_beaker()
         self.get_cabinet()
-
-        self.get_kitchen()
+        
+        if self.kitchen:
+            self.get_kitchen()
 
         self.add_camera()
 
@@ -187,9 +177,9 @@ class MobileAlohaPickCameraTask(MobileAlohaPickTask):
                 img = images/255
                 save_image(make_grid(img, nrows = 2), 'cartpole_export.png')
 
-            self.obs_buf = torch.swapaxes(images, 1, 3).clone().float()/255.0
+            obs_buf = torch.swapaxes(images, 1, 3).clone().float()/255.0
         else:
             print("Image tensor is NONE!")
 
 
-        return self.obs_buf
+        return obs_buf

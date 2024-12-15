@@ -53,6 +53,8 @@ class AlohaPlaceTask(RLTask):
         self.action_penalty_scale = self._task_cfg["env"]["actionPenaltyScale"]
         self.finger_close_reward_scale = self._task_cfg["env"]["fingerCloseRewardScale"]
 
+        self.kitchen = self._task_cfg["env"]["numEnvs"] == 1
+
         self.distX_offset = 0.04
         self.dt = 1/60.
 
@@ -81,7 +83,8 @@ class AlohaPlaceTask(RLTask):
         self.get_target_cube()
 
         # IF YOUR GPU ISN'T POWERFUL ENOUGH, COMMENT THIS LINE
-        self.get_kitchen()
+        if self.kitchen:
+            self.get_kitchen()
 
         # Here the env is cloned 
         super().set_up_scene(scene)

@@ -70,11 +70,16 @@ class MobileAlohaPickTask(RLTask):
         self.finger_dist_reward_scale = self._task_cfg["env"]["fingerDistRewardScale"]
         self.action_penalty_scale = self._task_cfg["env"]["actionPenaltyScale"]
         self.finger_close_reward_scale = self._task_cfg["env"]["fingerCloseRewardScale"]
+        self.kitchen = self._task_cfg["env"]["numEnvs"] == 1
 
     def set_up_scene(self, scene) -> None:
         self.get_aloha()
         self.get_beaker()
         self.get_cabinet()
+
+        # IF YOUR GPU ISN'T POWERFUL ENOUGH, COMMENT THIS LINE
+        if self.kitchen:
+            self.get_kitchen()
 
         super().set_up_scene(scene, filter_collisions=False)
 
@@ -276,7 +281,7 @@ class MobileAlohaPickTask(RLTask):
         self.franka_dof_pos[env_ids, :] = pos
 
         self._beaker.set_world_poses(self.default_beaker_pos[env_ids], self.default_beaker_rot[env_ids], env_ids.to(torch.int32))
-
+        self._beaker.set_velocities(torch.zeros_like(self.default_beaker_velocity[env_ids]), env_ids.to(torch.int32))
         self._alohas.set_joint_position_targets(self.franka_dof_targets[env_ids], indices=indices)
         self._alohas.set_joint_positions(dof_pos, indices=indices)
         self._alohas.set_joint_velocities(dof_vel, indices=indices)
@@ -299,7 +304,7 @@ class MobileAlohaPickTask(RLTask):
         )
 
         self.default_beaker_pos, self.default_beaker_rot = self._beaker.get_world_poses()
-
+        self.default_beaker_velocity = self._beaker.get_velocities()
         # randomize all envs
         indices = torch.arange(self._num_envs, dtype=torch.int64, device=self._device)
         self.reset_idx(indices)

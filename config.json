@@ -1,6 +1,9 @@
 {
     "aloha_usd_path": "/home/jacob/Desktop/assets/aloha-assets/viperx.usd",
     "mobile_aloha_usd_path": "/home/jacob/Desktop/assets/aloha-assets/mobile_aloha.usd",
+    "nav_aloha_usd_path": "/home/jacob/Desktop/assets/aloha-assets/ALOHA.usd",
+    
+    "kitchen_usd_path": "/home/jacob/Desktop/assets/scenes/sber_kitchen/sber_kitchen_12_1.usd",
 
-    "kitchen_usd_path": "/home/jacob/Desktop/assets/scenes/sber_kitchen/sber_kitchen_12_1.usd"
+    "cabinet_usd_path" : "/home/jacob/Desktop/assets/objects/cabinet.usd"
   }

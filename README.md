@@ -68,17 +68,26 @@ PYTHON_PATH rlgames_train.py task=AlohaPickLLM checkpoint=/path/to/checkpoin num
 ```
 For selecting cube, set ```task.env.apple=False```
 
+
+## Mobile-Manipulation:
+To run MobilePick task first download the [MobilePick Checkpoint](https://disk.yandex.com/d/9mt7bhUza0IEFQ) and then run the following command:
+
+```
+PYTHON_PATH rlgames_train.py task=MobilePick test=True num_envs=1 checkpoint=Path/to/MobilePick.pth
+```
+
+
 ## Upcoming Functionalities:
 
-1. Mobile Tasks
-2. Depth Camera and Sensors
+1. Manipulation wiht Knowledge Graph
+2. Mobile Task with Knowledge Graph
 3. GPT based encoding
 4. Sim-2-Real
 
 
 ## **IMPORTANT**!!!:
 
-* Make sure to install the correct versions of ISAAC-SIM (2023.1.0) , [OmniIsaacGymEnvs](5db8d510775d55a0b979fc18b361cd6aa5a97dde) and PyTorch-Nightly(2.1.0.dev20230616-devel) inorder to reproduce the results from the report
+* Make sure to install the correct versions of ISAAC-SIM (2023.1.0) , [OmniIsaacGymEnvs](5db8d510775d55a0b979fc18b361cd6aa5a97dde) and PyTorch-Nightly(2.1.0.dev20230616-devel) inorder to reproduce the results from the report.
 
 * If your GPU is not strong enough, or the simulation doesn't work, comment out ```get_kitchen()``` function (NEWER RTX MODELS USE DIFFERENT RAY-TRACING TECHNOLOGY WHICH IS MORE COMPUTATIONALLY HEAVY AND CAN FREEZE THE SIMULATION).
 
