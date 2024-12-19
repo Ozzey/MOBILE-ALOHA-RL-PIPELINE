@@ -18,11 +18,13 @@ This repository is based on OmniIsaacGymEnvs & Isaac-Sim 2023 and is used for au
    ```
      git clone https://github.com/Ozzey/ALOHA-RL
    ```
-5. Download the latest assets from [here](https://disk.yandex.com/d/mr830qgJpAeS_g) and place them in a new folder called ```assets``` in the root directory of the project.
+5. Download the latest assets from [here](https://disk.yandex.com/d/mr830qgJpAeS_g) and place them in a new folder called ```assets``` in the root directory of the project. If you want to use onboard cameras, download USD model for aloha from [here](https://cloud.mail.ru/public/wWgn/LXQy47rpH).
 6. Modify ```config.json``` to add the path to the assets as required.
 
 
 ## Training and Evaluation
+
+To use Domain Randomization, pass `task.domain_randomization.randomize=True` argument to the script `demo.py`
 
 1. **Training**: The following is example for training:
      ```PYTHON_PATH rlgames_train.py task=Cabinet headless=True```

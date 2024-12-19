@@ -8,7 +8,6 @@
 #
 
 import math
-import itertools
 
 import numpy as np
 import torch
@@ -47,9 +46,7 @@ class MobileAlohaPickTask(RLTask):
         self._num_actions = 8
 
         RLTask.__init__(self, name, env)
-        
-        self.add_camera = sim_config.task_config["sim"]["enable_cameras"]
-        self.camera_initialized = False
+        return
 
     def update_config(self, sim_config):
         self._sim_config = sim_config
@@ -75,8 +72,6 @@ class MobileAlohaPickTask(RLTask):
         self.action_penalty_scale = self._task_cfg["env"]["actionPenaltyScale"]
         self.finger_close_reward_scale = self._task_cfg["env"]["fingerCloseRewardScale"]
 
-        self.joint_indices = [6, 14, 18, 22, 26, 30, 34, 35]
-
     def set_up_scene(self, scene) -> None:
         self.get_aloha()
         self.get_beaker()
@@ -94,25 +89,11 @@ class MobileAlohaPickTask(RLTask):
         scene.add(self._beaker)        
 
         self.init_data()
-        
-        import omni.isaac.core.utils.prims as prim_utils
+        return
 
-        prim_utils.create_prim(
-            "/World/Light_1",
-            "DistantLight",
-            position=np.array([1.0, 1.0, 1.0]),
-            attributes={
-                "inputs:angle": 1.0,
-                "inputs:intensity": 5e3,
-            }
-        )
 
     def get_aloha(self):
-        aloha = MobileAloha(prim_path=self.default_zero_env_path + "/aloha",
-                            name="aloha",
-                            translation=torch.tensor([0.8, 0.25, 0.0]),
-                            orientation=torch.tensor([0.0, 0.0, 0.0, 0.0])
-                            )
+        aloha = MobileAloha(prim_path=self.default_zero_env_path + "/aloha", name="aloha")
         self._sim_config.apply_articulation_settings(
             "aloha", get_prim_at_path(aloha.prim_path), self._sim_config.parse_actor_config("aloha")
         )
@@ -134,45 +115,18 @@ class MobileAlohaPickTask(RLTask):
                 name = 'beaker',
                 position=[0.05, 0.0,  0.8],
                 orientation=[1,0,0,0],
-                size=0.045,
+                size=0.05,
                 prim_path=self.default_zero_env_path + "/beaker",
                 color=np.array([0, 1, 0]),
                 density = 100
             )
-
 
     def get_kitchen(self):
         kitchen = Kitchen(self.default_zero_env_path + "/kitchen", name="kitchen")
         self._sim_config.apply_articulation_settings(
             "kitchen", get_prim_at_path(kitchen.prim_path), self._sim_config.parse_actor_config("kitchen")
         )
-        
-    def set_up_camera(self) -> None:
-        from omni.isaac.sensor import Camera
-        import omni.replicator.core as rep
-        
-        self.__cameras = {}
-        self.__depth_annotators = {}
-        
-        camera_1_paths = [f"/World/envs/env_{i}/aloha/fl_link4/visuals/realsense/hand_cam" for i in range(self._num_envs)]
-        camera_2_paths = [f"/World/envs/env_{i}/aloha/base_link/realsense/realsense/base_cam" for i in range(self._num_envs)]
-        
-        for i, (p1, p2) in enumerate(zip(camera_1_paths, camera_2_paths)):
-            for camera_path in (p1, p2):
-                camera_name = camera_path.split('/')[-1] + f"_{i}"
-                camera = Camera(
-                    prim_path=camera_path,
-                    name=camera_name,
-                    resolution=(640, 480)
-                )
 
-                camera.initialize()
-                camera.add_motion_vectors_to_frame()
-
-                self.__depth_annotators[camera_name] = rep.AnnotatorRegistry.get_annotator("distance_to_camera")
-                self.__depth_annotators[camera_name].attach([camera._render_product_path])
-
-                self.__cameras[camera_name] = camera
 
     def init_data(self) -> None:
         def get_env_local_pose(env_pos, xformable, device):
@@ -248,9 +202,8 @@ class MobileAlohaPickTask(RLTask):
     def get_observations(self) -> dict:
         hand_pos, hand_rot = self._alohas._hands.get_world_poses(clone=False)
         drawer_pos, drawer_rot = self._beaker.get_world_poses(clone=False)
-        franka_dof_pos = self._alohas.get_joint_positions(clone=False)[:, self.joint_indices]
-        franka_dof_vel = self._alohas.get_joint_velocities(clone=False)[:, self.joint_indices]
-        # print(franka_dof_pos)
+        franka_dof_pos = self._alohas.get_joint_positions(clone=False)
+        franka_dof_vel = self._alohas.get_joint_velocities(clone=False)
         self.franka_dof_pos = franka_dof_pos
 
         (
@@ -291,18 +244,6 @@ class MobileAlohaPickTask(RLTask):
         observations = {self._alohas.name: {"obs_buf": self.obs_buf}}
         return observations
 
-    def render(self, camera_name, add_depth=False):
-        if add_depth:
-            image = self.__depth_annotators[camera_name].get_data()
-        else:
-            image = self.__cameras[camera_name].get_rgba()
-            if len(image.shape) < 3:
-                image = None
-            else:
-                image = image[:, :, :3]
-                image = np.swapaxes(image, 0, 1)
-        return image
-    
     def pre_physics_step(self, actions) -> None:
         if not self.world.is_playing():
             return
@@ -312,17 +253,13 @@ class MobileAlohaPickTask(RLTask):
             self.reset_idx(reset_env_ids)
         if self._dr_randomizer.randomize:
             dr.physics_view.step_randomization(reset_env_ids)
-        
-        env_ids_int32 = torch.arange(self._alohas.count, dtype=torch.int32, device=self._device)
-
 
         self.actions = actions.clone().to(self._device)
         targets = self.franka_dof_targets + self.franka_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.franka_dof_targets[:] = tensor_clamp(targets, self.franka_dof_lower_limits, self.franka_dof_upper_limits)
+        env_ids_int32 = torch.arange(self._alohas.count, dtype=torch.int32, device=self._device)
 
-        self._alohas.set_joint_position_targets(self.franka_dof_targets, indices=env_ids_int32, joint_indices=self.joint_indices)
-
-
+        self._alohas.set_joint_position_targets(self.franka_dof_targets, indices=env_ids_int32)
 
     def reset_idx(self, env_ids):
         indices = env_ids.to(dtype=torch.int32)
@@ -335,40 +272,36 @@ class MobileAlohaPickTask(RLTask):
             self.franka_dof_lower_limits,
             self.franka_dof_upper_limits,
         )
-        dof_pos = torch.zeros((num_indices, 8), device=self._device)
-        dof_vel = torch.zeros((num_indices, 8), device=self._device)
+        dof_pos = torch.zeros((num_indices, self._alohas.num_dof), device=self._device)
+        dof_vel = torch.zeros((num_indices, self._alohas.num_dof), device=self._device)
         dof_pos[:, :] = pos
         self.franka_dof_targets[env_ids, :] = pos
         self.franka_dof_pos[env_ids, :] = pos
 
         self._beaker.set_world_poses(self.default_beaker_pos[env_ids], self.default_beaker_rot[env_ids], env_ids.to(torch.int32))
-        self._beaker.set_velocities(torch.zeros_like(self.default_beaker_velocity[env_ids]), env_ids.to(torch.int32))
-        
-        self._alohas.set_joint_position_targets(self.franka_dof_targets[env_ids], indices=indices, joint_indices=self.joint_indices)
-        self._alohas.set_joint_positions(dof_pos, indices=indices, joint_indices=self.joint_indices)
-        self._alohas.set_joint_velocities(dof_vel, indices=indices, joint_indices=self.joint_indices)
-        # print("reset_working")
+
+        self._alohas.set_joint_position_targets(self.franka_dof_targets[env_ids], indices=indices)
+        self._alohas.set_joint_positions(dof_pos, indices=indices)
+        self._alohas.set_joint_velocities(dof_vel, indices=indices)
+
         # bookkeeping
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
 
     def post_reset(self):
-        self.num_franka_dofs = 8
+        self.num_franka_dofs = self._alohas.num_dof
         self.franka_dof_pos = torch.zeros((self.num_envs, self.num_franka_dofs), device=self._device)
         dof_limits = self._alohas.get_dof_limits()
-        self.franka_dof_lower_limits = dof_limits[0, self.joint_indices, 0].to(device=self._device)
-        self.franka_dof_upper_limits = dof_limits[0, self.joint_indices, 1].to(device=self._device)
+        self.franka_dof_lower_limits = dof_limits[0, :, 0].to(device=self._device)
+        self.franka_dof_upper_limits = dof_limits[0, :, 1].to(device=self._device)
         self.franka_dof_speed_scales = torch.ones_like(self.franka_dof_lower_limits)
-        # print(self.franka_dof_speed_scales)
-        # self.franka_dof_speed_scales[: ,34:35, :] = 0.1
-        # self.franka_dof_speed_scales[34] = 0.1
+        self.franka_dof_speed_scales[self._alohas.gripper_indices] = 0.1
         self.franka_dof_targets = torch.zeros(
             (self._num_envs, self.num_franka_dofs), dtype=torch.float, device=self._device
         )
 
         self.default_beaker_pos, self.default_beaker_rot = self._beaker.get_world_poses()
-        self.default_beaker_velocity = self._beaker.get_velocities()
 
         # randomize all envs
         indices = torch.arange(self._num_envs, dtype=torch.int64, device=self._device)

@@ -42,7 +42,7 @@ sim:
   disable_contact_processing: False
 
   # set to True if you use camera sensors in the environment
-  enable_cameras: False
+  enable_cameras: true
 
   default_physics_material:
     static_friction: 1.0
@@ -122,3 +122,26 @@ sim:
     # per-shape
     contact_offset: 0.005
     rest_offset: 0.0
+
+# --- DR ---
+domain_randomization:
+    randomize: False
+    randomization_params:
+        observations:
+            on_interval:
+                frequency_interval: 1
+                operation: "additive"
+                distribution: "gaussian"
+                distribution_parameters: [0, .002]
+        articulation_views:
+            aloha_view:
+                stiffness:
+                    on_reset:
+                        operation: "scaling"
+                        distribution: "uniform"
+                        distribution_parameters: [0.75, 1.25]
+                damping:
+                    on_reset:
+                        operation: "scaling"
+                        distribution: "uniform"
+                        distribution_parameters: [0.75, 1.25]
